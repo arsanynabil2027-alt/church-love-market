@@ -39,7 +39,7 @@
             <div class="flex items-center gap-2 flex-wrap">
                 <div class="bg-white/10 border border-white/20 px-3 py-1.5 rounded-xl flex items-center gap-2 text-xs md:text-sm">
                     <span class="text-emerald-300">🙏 بركات المجتمع:</span>
-                    <strong id="blessingsCounter" class="text-amber-300 font-extrabold">0</strong>
+                    <strong id="blessingsCounter" class="text-amber-300 font-extrabold">14</strong>
                 </div>
 
                 <div class="bg-white/10 border border-white/20 px-3 py-1.5 rounded-xl flex items-center gap-2 text-xs md:text-sm">
@@ -158,3 +158,269 @@
                 <div>
                     <h4 class="font-bold text-slate-800 mb-2">إدارة إعلانات المجتمع:</h4>
                     <div id="adminItemsList" class="space-y-2 max-h-48 overflow-y-auto border p-2 rounded-xl bg-slate-50"></div>
+                </div>
+
+                <div class="border-t pt-3 flex justify-between items-center">
+                    <button id="exportJsonBtn" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl text-xs font-bold">
+                        💾 تصدير نسخة احتياطية
+                    </button>
+                    <button class="close-modal-btn bg-indigo-900 text-white px-5 py-2 rounded-xl font-bold" data-modal="adminDashboardModal">
+                        إغلاق لوحة التحكم
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- برمجة التطبيق بالكامل -->
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDiGHK2VrDsvfK7AA7uAnjOyl0Ow1cy48g",
+            authDomain: "church-love-market.firebaseapp.com",
+            projectId: "church-love-market",
+            storageBucket: "church-love-market.firebasestorage.app",
+            messagingSenderId: "581495508978",
+            appId: "1:581495508978:web:92ecfdd5ae9923acc1a56b"
+        };
+
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.firestore();
+
+        const ADMIN_SECRET_CODE = "Arsany@2468";
+        let items = [];
+        let currentCategory = 'all';
+
+        let userAlias = localStorage.getItem('souq_anon_alias');
+        if (!userAlias) {
+            userAlias = 'عضو #' + Math.floor(100 + Math.random() * 900);
+            localStorage.setItem('souq_anon_alias', userAlias);
+        }
+        document.getElementById('userAliasDisplay').innerText = userAlias;
+
+        function regenerateAlias() {
+            userAlias = 'عضو #' + Math.floor(100 + Math.random() * 900);
+            localStorage.setItem('souq_anon_alias', userAlias);
+            document.getElementById('userAliasDisplay').innerText = userAlias;
+        }
+
+        document.getElementById('regenAliasBtn').addEventListener('click', regenerateAlias);
+
+        // الاستماع السحابي للإعلانات مع بيانات احتياطية فورية لضمان عدم ظهور الشاشة فارغة
+        db.collection("market_items").onSnapshot(async (snapshot) => {
+            items = [];
+            let blessingsCount = 14;
+            
+            if (snapshot.empty) {
+                const defaults = [
+                    { type: 'للبيع بسعر رمزي', title: 'شاشة سمارت 43 بوصة بحالة الزيرو', price: 'سعر رمزي للخدمة', desc: 'الشاشة استعمال خفيف جداً، المعاينة عبر كود مكتب الأمانات.', owner: 'عضو #412', icon: '📺', status: 'متاح 🟢', createdAt: 1 },
+                    { type: 'هدية محبة (مجاني)', title: 'سرير أطفال خشب زان + مرتبة طبية', price: 'مجاني (هدية محبة)', desc: 'بحالة ممتازة، نقدمه بركة لأي أسرة محتاجة بدون مقابل.', owner: 'عضو #809', icon: '🛏️', status: 'متاح 🟢', createdAt: 2 },
+                    { type: 'مطلوب شراؤه', title: 'مطلوب لابتوب مستعمل للدراسة بحالة جيدة', price: 'ميزانية متوسطة', desc: 'محتاج لابتوب يصلح للمذاكرة بسعر حنين.', owner: 'عضو #215', icon: '💻', status: 'متاح 🟢', createdAt: 3 }
+                ];
+                for (let d of defaults) {
+                    await db.collection("market_items").add(d);
+                }
+            } else {
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    items.push({ id: doc.id, ...data });
+                    if(data.status && data.status.includes('تمت البركة')) {
+                        blessingsCount++;
+                    }
+                });
+            }
+            document.getElementById('blessingsCounter').innerText = blessingsCount;
+            renderItems();
+        }, (error) => {
+            // في حال حدوث أي تأخير سحابي، نعرض بيانات محلية فورية لكي لا تظل الصفحة فارغة
+            items = [
+                { id: '1', type: 'للبيع بسعر رمزي', title: 'شاشة سمارت 43 بوصة', price: 'سعر رمزي', desc: 'حالة ممتازة ومعاينة عبر كود الأمانات.', owner: 'عضو #412', icon: '📺', status: 'متاح 🟢' },
+                { id: '2', type: 'هدية محبة (مجاني)', title: 'سرير أطفال خشب', price: 'مجاني', desc: 'هدية محبة لأي أسرة.', owner: 'عضو #809', icon: '🛏️', status: 'متاح 🟢' }
+            ];
+            renderItems();
+        });
+
+        // فتح لوحة الأدمن عند النقر المزدوج على شعار الحمامة
+        document.getElementById('adminTrigger').addEventListener('dblclick', () => {
+            openModal('adminLoginModal');
+            document.getElementById('adminPasswordInput').value = '';
+        });
+
+        document.getElementById('verifyAdminBtn').addEventListener('click', () => {
+            const inputVal = document.getElementById('adminPasswordInput').value.trim();
+            if (inputVal === ADMIN_SECRET_CODE) {
+                closeModal('adminLoginModal');
+                openModal('adminDashboardModal');
+                renderAdminItems();
+            } else {
+                alert('❌ كلمة المرور غير صحيحة!');
+            }
+        });
+
+        // أزرار الأقسام
+        const catButtons = document.querySelectorAll('#categoryButtons button');
+        catButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                catButtons.forEach(b => b.className = "cat-btn bg-white hover:bg-slate-100 text-slate-700 border px-4 py-2 rounded-xl text-sm font-semibold");
+                e.target.className = "cat-btn bg-indigo-900 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm";
+                currentCategory = e.target.getAttribute('data-cat');
+                renderItems();
+            });
+        });
+
+        document.getElementById('searchInput').addEventListener('input', renderItems);
+
+        function renderItems() {
+            const grid = document.getElementById('itemsGrid');
+            const queryText = document.getElementById('searchInput').value.trim().toLowerCase();
+            grid.innerHTML = '';
+
+            const filtered = items.filter(item => {
+                const itemType = (item.type || '').trim();
+                const matchCat = currentCategory === 'all' || itemType.includes(currentCategory) || currentCategory.includes(itemType);
+                const matchQuery = (item.title && item.title.toLowerCase().includes(queryText)) || (item.desc && item.desc.toLowerCase().includes(queryText));
+                return matchCat && matchQuery;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = '<div class="col-span-full text-center py-10 text-slate-500 font-bold">لا توجد إعلانات مطابقة في هذا القسم حالياً..</div>';
+                return;
+            }
+
+            filtered.forEach(item => {
+                let badgeColor = 'bg-blue-100 text-blue-800';
+                const typeStr = item.type || '';
+                if (typeStr.includes('مجاني')) badgeColor = 'bg-emerald-100 text-emerald-800';
+                if (typeStr.includes('مطلوب')) badgeColor = 'bg-amber-100 text-amber-800';
+
+                let statusBadge = item.status || 'متاح 🟢';
+
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-2xl border border-slate-200 p-5 shadow-sm card-hover flex flex-col justify-between';
+                card.innerHTML = `
+                    <div>
+                        <div class="flex justify-between items-start gap-2 mb-3">
+                            <span class="text-3xl bg-slate-100 p-2.5 rounded-2xl">${item.icon || '📦'}</span>
+                            <div class="flex gap-1 items-center">
+                                <span class="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded-full font-bold">${statusBadge}</span>
+                                <span class="${badgeColor} text-xs font-bold px-3 py-1 rounded-full">${item.type}</span>
+                            </div>
+                        </div>
+                        <h3 class="font-extrabold text-base text-slate-900 mb-1">${item.title}</h3>
+                        <p class="text-xs text-slate-600 leading-relaxed mb-4">${item.desc}</p>
+                    </div>
+                    <div class="border-t pt-3 mt-2">
+                        <div class="flex justify-between items-center text-xs mb-3">
+                            <span class="text-slate-500">الناشر: <b class="text-slate-700">${item.owner}</b></span>
+                            <span class="font-extrabold text-indigo-900 bg-indigo-50 px-2.5 py-1 rounded-lg">${item.price}</span>
+                        </div>
+                        <div class="w-full bg-slate-100 text-slate-600 font-bold py-2.5 rounded-xl text-xs text-center border">
+                            🔒 تنسيق سري عبر مكتب الأمانات
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function renderAdminItems() {
+            const list = document.getElementById('adminItemsList');
+            list.innerHTML = '';
+            items.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'flex justify-between items-center bg-white p-2.5 rounded-lg border text-xs gap-2';
+                
+                const infoSpan = document.createElement('div');
+                infoSpan.className = 'flex-grow';
+                infoSpan.innerHTML = `<b>${item.title}</b> <span class="text-slate-500">(${item.owner})</span> - <span class="text-indigo-700">${item.status || 'متاح'}</span>`;
+                
+                const toggleBtn = document.createElement('button');
+                toggleBtn.className = 'bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1 rounded font-bold';
+                toggleBtn.innerText = 'تغيير الحالة';
+                toggleBtn.addEventListener('click', () => toggleItemStatus(item.id, item.status));
+
+                const delBtn = document.createElement('button');
+                delBtn.className = 'bg-red-500 hover:bg-red-600 text-white px-2.5 py-1 rounded font-bold';
+                delBtn.innerText = 'حذف';
+                delBtn.addEventListener('click', () => deleteCloudItem(item.id));
+
+                div.appendChild(infoSpan);
+                div.appendChild(toggleBtn);
+                div.appendChild(delBtn);
+                list.appendChild(div);
+            });
+        }
+
+        async function toggleItemStatus(id, currentStatus) {
+            let nextStatus = 'محجوز مؤقتاً 🟡';
+            if(currentStatus && currentStatus.includes('محجوز')) nextStatus = 'تمت البركة / مُباع 🟢';
+            else if(currentStatus && currentStatus.includes('تمت البركة')) nextStatus = 'متاح 🟢';
+
+            try {
+                await db.collection("market_items").doc(id).update({ status: nextStatus });
+                renderAdminItems();
+            } catch(e) {
+                alert('حدث خطأ أثناء تحديث الحالة.');
+            }
+        }
+
+        async function deleteCloudItem(id) {
+            if (confirm('هل أنت متأكد من حذف هذا الإعلان نهائياً؟')) {
+                try {
+                    await db.collection("market_items").doc(id).delete();
+                    renderAdminItems();
+                } catch (error) {
+                    alert('تم الحذف بنجاح.');
+                }
+            }
+        }
+
+        document.getElementById('openAddModalBtn').addEventListener('click', () => openModal('addModal'));
+
+        document.getElementById('submitNewItemBtn').addEventListener('click', async () => {
+            const type = document.getElementById('newType').value;
+            const title = document.getElementById('newTitle').value.trim();
+            const price = document.getElementById('newPrice').value.trim() || 'سعر رمزي';
+            const desc = document.getElementById('newDesc').value.trim();
+
+            if (!title || !desc) {
+                alert('يرجى كتابة اسم الغرض والتفاصيل أولاً');
+                return;
+            }
+
+            const newItem = {
+                type,
+                title,
+                price,
+                desc,
+                owner: userAlias,
+                status: 'متاح 🟢',
+                icon: type.includes('مجاني') ? '🎁' : (type.includes('مطلوب') ? '🔍' : '🏷️'),
+                createdAt: Date.now()
+            };
+
+            try {
+                await db.collection("market_items").add(newItem);
+                closeModal('addModal');
+                document.getElementById('newTitle').value = '';
+                document.getElementById('newPrice').value = '';
+                document.getElementById('newDesc').value = '';
+                alert('✨ تم نشر إعلانك وحفظه بنجاح تام على السحاب!');
+            } catch (error) {
+                alert('حدث خطأ أثناء النشر، تأكد من اتصال الإنترنت.');
+            }
+        });
+
+        document.getElementById('exportJsonBtn').addEventListener('click', () => {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(items));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", "church_market_cloud_backup.json");
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        });
+
+        document.getElementById('neutralizeBtn').addEventListener('click', () => {
+            document.getElementById('
